@@ -1,0 +1,12 @@
+[Unit]
+Description=Raptor USB MIDI watcher
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/raptor-midi-usb-watcher --config /etc/raptor-midi-usb-watcher/raptor-midi-usb-watcher.yaml
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

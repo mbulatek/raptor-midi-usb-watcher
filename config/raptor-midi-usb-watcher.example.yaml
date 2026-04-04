@@ -1,0 +1,15 @@
+logging:
+  level: info
+
+scan:
+  period_ms: 1000
+  stable_cycles: 2
+
+midi_io:
+  config_path: /etc/raptor-midi-io-service/raptor-midi-io-service.yaml
+  control_endpoint: ipc:///run/raptor/midi-io-control.sock
+  reload_command: reload-config
+
+controllers:
+  - id: x-touch-mini-a
+    match_name: X-TOUCH MINI
