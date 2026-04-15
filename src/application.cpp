@@ -7,9 +7,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include <cstdint>
 #include <string>
 #include <thread>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -46,17 +47,119 @@ std::string join_detected_key(const std::vector<AlsaPort>& ports) {
     return out;
 }
 
+std::string slugify_id(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+
+    bool last_dash = false;
+    for (const char c : s) {
+        const unsigned char uc = static_cast<unsigned char>(c);
+        const bool is_alnum =
+            (uc >= 'A' && uc <= 'Z') ||
+            (uc >= 'a' && uc <= 'z') ||
+            (uc >= '0' && uc <= '9');
+
+        if (is_alnum) {
+            out.push_back(static_cast<char>(std::tolower(uc)));
+            last_dash = false;
+        } else {
+            if (!out.empty() && !last_dash) {
+                out.push_back('-');
+                last_dash = true;
+            }
+        }
+    }
+
+    while (!out.empty() && out.back() == '-') {
+        out.pop_back();
+    }
+
+    return out.empty() ? std::string{"usb-midi"} : out;
+}
+
+bool is_ignored_port(const AlsaPort& p) {
+    // Filter well-known non-controller ports.
+    if (p.client_name == "System") {
+        return true;
+    }
+    if (p.client_name == "Midi Through") {
+        return true;
+    }
+    if (p.port_name == "Announce") {
+        return true;
+    }
+    return false;
+}
+
+std::vector<AlsaPort> filter_ports(std::vector<AlsaPort> ports) {
+    ports.erase(
+        std::remove_if(ports.begin(), ports.end(), [](const AlsaPort& p) { return is_ignored_port(p); }),
+        ports.end());
+    return ports;
+}
+
+std::vector<UsbControllerState> build_auto_states(const std::vector<AlsaPort>& ports) {
+    std::vector<UsbControllerState> states;
+    states.reserve(ports.size());
+
+    std::unordered_map<std::string, std::uint32_t> used;
+
+    for (const auto& p : ports) {
+        const std::string match_name = p.client_name + " " + p.port_name;
+
+        std::string id = slugify_id(match_name);
+        auto& n = used[id];
+        ++n;
+        if (n > 1) {
+            id += "-" + std::to_string(n);
+        }
+
+        states.push_back(UsbControllerState {
+            .id = std::move(id),
+            .match_name = match_name,
+            .enabled = true,
+        });
+    }
+
+    return states;
+}
+
+std::vector<UsbControllerState> build_allowlist_states(const std::vector<ControllerRule>& rules, const std::vector<AlsaPort>& ports) {
+    std::vector<UsbControllerState> states;
+    states.reserve(rules.size());
+
+    for (const auto& rule : rules) {
+        bool present = false;
+        for (const auto& port : ports) {
+            const std::string full_name = port.client_name + " " + port.port_name;
+            if (contains_case_insensitive(full_name, rule.match_name)) {
+                present = true;
+                break;
+            }
+        }
+
+        states.push_back(UsbControllerState {
+            .id = rule.id,
+            .match_name = rule.match_name,
+            .enabled = present,
+        });
+    }
+
+    return states;
+}
+
 }  // namespace
 
 Application::Application(ServiceConfig config) : config_(std::move(config)) {}
 
 int Application::run() {
     spdlog::info(
-        "starting scan_period_ms={} stable_cycles={} midi_io_cfg={} control={}",
+        "starting scan_period_ms={} stable_cycles={} midi_io_cfg={} control={} mode={}",
         config_.scan.period_ms,
         config_.scan.stable_cycles,
         config_.midi_io.config_path,
-        config_.midi_io.control_endpoint);
+        config_.midi_io.control_endpoint,
+        config_.controllers.empty() ? "auto" : "allowlist");
 
     AlsaEnumerator enumerator;
     ControlClient control(config_.midi_io.control_endpoint);
@@ -66,7 +169,10 @@ int Application::run() {
     std::uint32_t stable_count = 0;
 
     while (true) {
-        const auto ports = enumerator.scan();
+        auto ports = filter_ports(enumerator.scan());
+        std::sort(ports.begin(), ports.end(), [](const AlsaPort& a, const AlsaPort& b) {
+            return a.full_name < b.full_name;
+        });
         const auto key = join_detected_key(ports);
 
         if (key != stable_key) {
@@ -85,20 +191,10 @@ int Application::run() {
             }
 
             std::vector<UsbControllerState> states;
-            states.reserve(config_.controllers.size());
-            for (const auto& rule : config_.controllers) {
-                bool present = false;
-                for (const auto& port : ports) {
-                    if (contains_case_insensitive(port.full_name, rule.match_name)) {
-                        present = true;
-                        break;
-                    }
-                }
-                states.push_back(UsbControllerState {
-                    .id = rule.id,
-                    .match_name = rule.match_name,
-                    .enabled = present,
-                });
+            if (config_.controllers.empty()) {
+                states = build_auto_states(ports);
+            } else {
+                states = build_allowlist_states(config_.controllers, ports);
             }
 
             if (!update_midi_io_config_usb_controllers(config_.midi_io.config_path, states)) {

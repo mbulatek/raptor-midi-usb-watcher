@@ -17,7 +17,7 @@ struct ScanConfig {
 
 struct MidiIoConfig {
     std::string config_path {"/etc/raptor-midi-io-service/raptor-midi-io-service.yaml"};
-    std::string control_endpoint {"ipc:///run/raptor/midi-io-control.sock"};
+    std::string control_endpoint {"ipc:///run/raptor-midi-io/control.zmq"};
     std::string reload_command {"reload-config"};
 };
 
@@ -37,3 +37,4 @@ struct ServiceConfig {
 ServiceConfig load_config(const std::string& path);
 
 }  // namespace raptor::midi_usb_watcher
+
