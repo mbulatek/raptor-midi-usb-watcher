@@ -7,9 +7,11 @@ scan:
 
 midi_io:
   config_path: /etc/raptor-midi-io-service/raptor-midi-io-service.yaml
-  control_endpoint: ipc:///run/raptor/midi-io-control.sock
+  control_endpoint: ipc:///run/raptor-midi-io/control.zmq
   reload_command: reload-config
 
-controllers:
-  - id: x-touch-mini-a
-    match_name: X-TOUCH MINI
+# Optional allowlist. If omitted or empty, watcher runs in auto-discovery mode
+# and will mirror all detected ALSA input ports into usb_midi_controllers.
+#controllers:
+#  - id: x-touch-mini-a
+#    match_name: X-TOUCH MINI

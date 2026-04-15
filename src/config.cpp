@@ -55,10 +55,6 @@ ServiceConfig load_config(const std::string& path) {
         }
     }
 
-    if (cfg.controllers.empty()) {
-        throw std::runtime_error("config.controllers is empty; add at least 1 rule");
-    }
-
     return cfg;
 }
 
