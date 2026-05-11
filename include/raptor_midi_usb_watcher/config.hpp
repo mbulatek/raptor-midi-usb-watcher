@@ -16,8 +16,8 @@ struct ScanConfig {
 };
 
 struct MidiIoConfig {
-    std::string config_path {"/etc/raptor-midi-io-service/raptor-midi-io-service.yaml"};
-    std::string control_endpoint {"ipc:///run/raptor-midi-io/control.zmq"};
+    std::string config_path {"/etc/raptor-engine/midi-devices.yaml"};
+    std::string control_endpoint {"ipc:///run/raptor-engine/midi-control.zmq"};
     std::string reload_command {"reload-config"};
 };
 
