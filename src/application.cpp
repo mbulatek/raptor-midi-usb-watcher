@@ -79,6 +79,7 @@ std::string slugify_id(const std::string& s) {
 
 bool is_ignored_port(const AlsaPort& p) {
     // Filter well-known non-controller ports.
+    const std::string full_name = p.client_name + " " + p.port_name;
     if (p.client_name == "System") {
         return true;
     }
@@ -88,12 +89,26 @@ bool is_ignored_port(const AlsaPort& p) {
     if (p.port_name == "Announce") {
         return true;
     }
+    if (contains_case_insensitive(full_name, "raptor-engine") ||
+        contains_case_insensitive(full_name, "raptor-feedback") ||
+        contains_case_insensitive(full_name, "auto-raptor-")) {
+        return true;
+    }
     return false;
 }
 
-std::vector<AlsaPort> filter_ports(std::vector<AlsaPort> ports) {
+bool is_blacklisted_port(const AlsaPort& port, const std::vector<DeviceBlacklistRule>& rules) {
+    const std::string full_name = port.client_name + " " + port.port_name;
+    return std::any_of(rules.begin(), rules.end(), [&](const DeviceBlacklistRule& rule) {
+        return contains_case_insensitive(full_name, rule.match_name);
+    });
+}
+
+std::vector<AlsaPort> filter_ports(std::vector<AlsaPort> ports, const std::vector<DeviceBlacklistRule>& blacklist) {
     ports.erase(
-        std::remove_if(ports.begin(), ports.end(), [](const AlsaPort& p) { return is_ignored_port(p); }),
+        std::remove_if(ports.begin(), ports.end(), [&](const AlsaPort& p) {
+            return is_ignored_port(p) || is_blacklisted_port(p, blacklist);
+        }),
         ports.end());
     return ports;
 }
@@ -160,6 +175,9 @@ int Application::run() {
         config_.midi_io.config_path,
         config_.midi_io.control_endpoint,
         config_.controllers.empty() ? "auto" : "allowlist");
+    if (!config_.blacklist.empty()) {
+        spdlog::info("usb midi blacklist entries={}", config_.blacklist.size());
+    }
 
     AlsaEnumerator enumerator;
     ControlClient control(config_.midi_io.control_endpoint);
@@ -169,7 +187,7 @@ int Application::run() {
     std::uint32_t stable_count = 0;
 
     while (true) {
-        auto ports = filter_ports(enumerator.scan());
+        auto ports = filter_ports(enumerator.scan(), config_.blacklist);
         std::sort(ports.begin(), ports.end(), [](const AlsaPort& a, const AlsaPort& b) {
             return a.full_name < b.full_name;
         });
