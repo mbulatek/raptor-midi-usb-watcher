@@ -30,8 +30,13 @@ std::vector<AlsaPort> AlsaEnumerator::scan() const {
         snd_seq_port_info_set_port(port_info, -1);
         while (snd_seq_query_next_port(seq, port_info) >= 0) {
             const unsigned int caps = snd_seq_port_info_get_capability(port_info);
-            // We want ports we can "read from" via a subscription (controller -> our input port).
-            if ((caps & SND_SEQ_PORT_CAP_READ) == 0 || (caps & SND_SEQ_PORT_CAP_SUBS_READ) == 0) {
+            const bool readable =
+                (caps & SND_SEQ_PORT_CAP_READ) != 0 &&
+                (caps & SND_SEQ_PORT_CAP_SUBS_READ) != 0;
+            const bool writable =
+                (caps & SND_SEQ_PORT_CAP_WRITE) != 0 &&
+                (caps & SND_SEQ_PORT_CAP_SUBS_WRITE) != 0;
+            if (!readable && !writable) {
                 continue;
             }
 

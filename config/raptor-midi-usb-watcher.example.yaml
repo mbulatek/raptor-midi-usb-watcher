@@ -11,7 +11,13 @@ midi_io:
   reload_command: reload-config
 
 # Optional allowlist. If omitted or empty, watcher runs in auto-discovery mode
-# and will mirror all detected ALSA input ports into usb_midi_controllers.
+# and will mirror all detected ALSA MIDI input/output ports into usb_midi_controllers.
 #controllers:
 #  - id: x-touch-mini-a
 #    match_name: X-TOUCH MINI
+
+# Optional blacklist. Matching is case-insensitive substring matching against
+# "<ALSA client name> <ALSA port name>". Blacklisted devices are never mirrored
+# into usb_midi_controllers, even in auto-discovery mode.
+#blacklist:
+#  - match_name: X-TOUCH MINI

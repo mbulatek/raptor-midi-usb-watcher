@@ -1,6 +1,7 @@
 #include "raptor_midi_usb_watcher/config.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 #include <yaml-cpp/yaml.h>
 
@@ -51,6 +52,19 @@ ServiceConfig load_config(const std::string& path) {
             rule.match_name = scalar_or(item, "match_name");
             if (!rule.id.empty() && !rule.match_name.empty()) {
                 cfg.controllers.push_back(std::move(rule));
+            }
+        }
+    }
+
+    if (root["blacklist"] && root["blacklist"].IsSequence()) {
+        for (const auto& item : root["blacklist"]) {
+            if (!item.IsMap()) {
+                continue;
+            }
+            DeviceBlacklistRule rule;
+            rule.match_name = scalar_or(item, "match_name");
+            if (!rule.match_name.empty()) {
+                cfg.blacklist.push_back(std::move(rule));
             }
         }
     }

@@ -26,12 +26,17 @@ struct ControllerRule {
     std::string match_name;
 };
 
+struct DeviceBlacklistRule {
+    std::string match_name;
+};
+
 struct ServiceConfig {
     std::string config_path;
     LoggingConfig logging;
     ScanConfig scan;
     MidiIoConfig midi_io;
     std::vector<ControllerRule> controllers;
+    std::vector<DeviceBlacklistRule> blacklist;
 };
 
 ServiceConfig load_config(const std::string& path);
